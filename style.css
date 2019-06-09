@@ -3,7 +3,7 @@ html, body {
     overflow: hidden;
     margin: 0;
     padding: 0;
-    background: #222;
+    background: #666;
 }
 
 #main {
@@ -15,5 +15,13 @@ html, body {
 }
 
 canvas {
-    border-radius: 32px;
+    border-radius: 4px;
+    border: 2px solid black;
+    box-shadow: 0 0 0 2px white;
+    width: calc(64 * 12px);
+    height: calc(64 * 12px);
+    image-rendering: -moz-crisp-edges;
+    image-rendering: -webkit-crisp-edges;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
 }

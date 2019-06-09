@@ -6,8 +6,8 @@ let lastTimestamp
 let mapWidth = 100
 let mapHeight = 100
 
-let screenWidth = 16
-let screenHeight = 16
+let screenWidth = 12
+let screenHeight = 12
 
 let tileWidth = 32
 let tileHeight = 32
@@ -17,6 +17,7 @@ let offsetY
 
 let avatarX
 let avatarY
+let avatarDirection = 'left'
 
 let greebles
 let trees
@@ -30,6 +31,9 @@ let turnsBetweenPredators = 50
 let turnsSinceLastPredator
 
 let gameState
+
+let spritesheet
+let images = {}
 
 let makeCritter = (type) => {
     let x = null
@@ -56,7 +60,8 @@ let makeCritter = (type) => {
         x,
         y,
         turnTimer: 0,
-        blockedTurns: 0
+        blockedTurns: 0,
+        direction: 'left'
     }
 }
 
@@ -187,6 +192,10 @@ let update = (timestamp) => {
         else if (lastKey === 'ArrowUp') newAvatarY--
         else if (lastKey === 'ArrowDown') newAvatarY++
 
+        // set direction of avatar
+        if (newAvatarX > avatarX) avatarDirection = 'right'
+        if (newAvatarX < avatarX) avatarDirection = 'left'
+
         // check edges
         if (newAvatarX < 0 || newAvatarX >= mapWidth) blocked = true
         if (newAvatarY < 0 || newAvatarY >= mapHeight) blocked = true
@@ -252,59 +261,42 @@ let update = (timestamp) => {
     lastTimestamp = timestamp
 
     // clear screen
-    context.fillStyle = 'black'
+    context.fillStyle = '#DAD1AB'
     context.fillRect(0, 0, canvas.width, canvas.height)
 
     // draw terrain
     greebles.forEach(greeble => {
-        let gX = greeble.x - offsetX
-        let gY = greeble.y - offsetY
-        context.fillStyle = greeble.variant === 99 ? 'cornflowerblue' : '#444'
-        context.fillRect(gX * tileWidth, gY * tileHeight, tileWidth, tileHeight)
+        let greebleVariant = greeble.variant === 99 ? 'greeble-portal' : 'greeble'
+        images[greebleVariant].draw(greeble.x - offsetX, greeble.y - offsetY)
     })
     trees.forEach(tree => {
-        let tX = tree.x - offsetX
-        let tY = tree.y - offsetY
-        context.fillStyle = 'darkkhaki'
-        context.fillRect(tX * tileWidth, tY * tileHeight, tileWidth, tileHeight)
+        images['tree'].draw(tree.x - offsetX, tree.y - offsetY)
     })
     rocks.forEach(rock => {
-        let rX = rock.x - offsetX
-        let rY = rock.y - offsetY
-        context.fillStyle = '#ccc'
-        context.fillRect(rX * tileWidth, rY * tileHeight, tileWidth, tileHeight)
+        images['rock'].draw(rock.x - offsetX, rock.y - offsetY)
     })
 
     // draw portal
-    portals.forEach(portal => {
-        let pX = portal.x - offsetX
-        let pY = portal.y - offsetY
-        context.fillStyle = 'blue'
-        context.fillRect(pX * tileWidth, pY * tileHeight, tileWidth, tileHeight)
+    portals.forEach((portal, i) => {
+        images['portal-' + i].draw(portal.x - offsetX, portal.y - offsetY)
     })
 
     // draw avatar
-    let aX = avatarX - offsetX
-    let aY = avatarY - offsetY
-    context.fillStyle = 'white'
-    context.fillRect(aX * tileWidth, aY * tileHeight, tileWidth, tileHeight)
+    images['avatar'].draw(avatarX - offsetX, avatarY - offsetY, avatarDirection === 'right')
 
     // draw critters
     critters.forEach(critter => {
-        let cX = critter.x - offsetX
-        let cY = critter.y - offsetY
-        if (cX >= 0 && cX < screenWidth && cY >= 0 && cY < screenHeight) {
+        let cx = critter.x - offsetX
+        let cy = critter.y - offsetY
+        if (cx >= 0 && cx < screenWidth && cy >= 0 && cy < screenHeight) {
             if (critter.type === 'prey') {
-                context.fillStyle = 'hotpink'
-            }
-            else if (critter.type === 'predator') {
-                context.fillStyle = 'red'
+                images['prey'].draw(cx, cy, critter.direction === 'right')
             }
             else if (critter.type === 'dead') {
-                context.fillStyle = 'pink'
+                images['prey-dead'].draw(cx, cy, critter.direction === 'right')
             }
-            if (critter.type !== 'in-portal') {
-                context.fillRect(cX * tileWidth, cY * tileHeight, tileWidth, tileHeight)
+            else if (critter.type === 'predator') {
+                images['predator'].draw(cx, cy, critter.direction === 'right')
             }
         }
     })
@@ -317,7 +309,6 @@ let takeTurn = () => {
     if (turnsSinceLastPredator > turnsBetweenPredators && critters.length - numPrey < numPredators) {
         turnsSinceLastPredator = 0
         critters.push(makeCritter('predator'))
-        console.log('predator added')
     }
 
     critters.forEach(critter => {
@@ -395,6 +386,10 @@ let takeTurn = () => {
         if (critter.type === 'prey') critter.turnTimer = 0
         else if (critter.type === 'predator') critter.turnTimer = 1
 
+        // set direction of critter
+        if (newX > critter.x) critter.direction = 'right'
+        if (newX < critter.x) critter.direction = 'left'
+
         // check collision with avatar
         if (newX === avatarX && newY === avatarY) {
             blocked = true
@@ -433,7 +428,6 @@ let takeTurn = () => {
             if (newX === portal.x && newY === portal.y) {
                 if (pushed) {
                     critter.type = 'in-portal'
-                    console.log('TRANSCEND', critters.filter(c => c.type === 'in-portal').length)
                     if (critters.filter(c => c.type === 'prey').length === 0) {
                         endGame()
                     }
@@ -492,6 +486,30 @@ let endGame = () => {
     gameState = 'end'
 }
 
+let createSprite = (spriteX, spriteY) => {
+    return {
+        draw: (x, y, flipped) => {
+            if (flipped) {
+                context.save()
+                context.translate(canvas.width, 0)
+                context.scale(-1, 1)
+                context.drawImage(
+                    spritesheet,
+                    spriteX * tileWidth, spriteY * tileHeight, tileWidth, tileHeight,
+                    canvas.width - (x * tileWidth) - tileWidth, y * tileHeight, tileWidth, tileHeight
+                )
+                context.restore()
+            } else {
+                context.drawImage(
+                    spritesheet,
+                    spriteX * tileWidth, spriteY * tileHeight, tileWidth, tileHeight,
+                    x * tileWidth, y * tileHeight, tileWidth, tileHeight
+                )
+            }
+        }
+    }
+}
+
 window.onload = () => {
     let main = document.getElementById('main')
     canvas = document.createElement('canvas')
@@ -499,6 +517,27 @@ window.onload = () => {
     canvas.height = screenHeight * tileHeight
     context = canvas.getContext('2d')
     main.appendChild(canvas)
+
+    spritesheet = document.getElementById('spritesheet')
+    images = {
+        'avatar': createSprite(0, 0),
+        'predator': createSprite(0, 1),
+        'prey': createSprite(1, 1),
+        'prey-dead': createSprite(2, 1),
+        'tree': createSprite(0, 2),
+        'rock': createSprite(1, 2),
+        'greeble': createSprite(2, 2),
+        'greeble-portal': createSprite(2, 0),
+        'portal-0': createSprite(0, 3),
+        'portal-1': createSprite(1, 3),
+        'portal-2': createSprite(2, 3),
+        'portal-3': createSprite(0, 4),
+        'portal-4': createSprite(1, 4),
+        'portal-5': createSprite(2, 4),
+        'portal-6': createSprite(0, 5),
+        'portal-7': createSprite(1, 5),
+        'portal-8': createSprite(2, 5),
+    }
 
     document.addEventListener('keydown', e => {
         if (!e.key.includes('Arrow')) return
