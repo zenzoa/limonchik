@@ -1,7 +1,11 @@
+let title = 'l i m o n c h i k'
+
 let canvas, context
 let lastKey
 let keyDebounce = 0
 let lastTimestamp
+let lastAnimationFrame
+let animationStep = 0
 
 let mapWidth = 100
 let mapHeight = 100
@@ -155,23 +159,66 @@ let generateMap = () => {
 
 let update = (timestamp) => {
     if (gameState === 'start') {
-        if (lastKey) {
-            gameState = 'play'
+        if (!lastAnimationFrame) lastAnimationFrame = timestamp
+        if (timestamp - lastAnimationFrame > 150) {
+            lastAnimationFrame = null
+            animationStep++
+        }
+        
+        if (animationStep >= title.length) {
+            animationStep = title.length
+            if (lastKey) {
+                gameState = 'play'
+            }
+        } else {
+            lastKey = null
         }
 
-        context.fillStyle = 'black'
+        // draw background
+        context.fillStyle = '#444'
         context.fillRect(0, 0, canvas.width, canvas.height)
+
+        // draw text
+        let text = title.slice(0, animationStep)
+        context.fillStyle = 'FFE700'
+        context.font = 'bold 48px sans-serif'
+        context.textAlign = 'left'
+        context.textBaseline = 'middle'
+        let textMetrics = context.measureText(title)
+        context.fillText(text, (canvas.width - textMetrics.width) / 2, canvas.height / 2)
 
         window.requestAnimationFrame(update)
         return
     }
     else if (gameState === 'end') {
-        if (lastKey) {
-            startGame()
+        let numPreyInPortal = critters.filter(c => c.type === 'in-portal').length
+
+        if (!lastAnimationFrame) lastAnimationFrame = timestamp
+        if (timestamp - lastAnimationFrame > (2000 / numPreyInPortal)) {
+            lastAnimationFrame = null
+            animationStep++
+        }
+        
+        if (animationStep >= numPreyInPortal) {
+            animationStep = numPreyInPortal
+            if (lastKey) {
+                startGame()
+            }
+        } else {
+            lastKey = null
         }
 
-        context.fillStyle = 'white'
+        // draw background
+        context.fillStyle = '#444'
         context.fillRect(0, 0, canvas.width, canvas.height)
+
+        // draw all prey that went into portal
+        for (let i = 0; i < animationStep; i++) {
+            let cx = tileWidth - 10 + Math.floor(i % 10) * (tileWidth + 2)
+            let cy = canvas.height - tileHeight - (tileHeight - 10 + Math.floor(i / 10) * (tileHeight + 2))
+            let isFlipped = i % 3 === 0
+            images['prey'].draw(cx, cy, isFlipped, true)
+        }
 
         window.requestAnimationFrame(update)
         return
@@ -470,6 +517,8 @@ let startGame = () => {
 
     turnsSinceLastPredator = 0
     lastTimestamp = null
+    lastAnimationFrame = null
+    animationStep = 0
     lastKey = null
 
     // init map
@@ -483,12 +532,15 @@ let startGame = () => {
 
 let endGame = () => {
     lastKey = null
+    animationStep = 0
     gameState = 'end'
 }
 
 let createSprite = (spriteX, spriteY) => {
     return {
-        draw: (x, y, flipped) => {
+        draw: (x, y, flipped, precise) => {
+            x = precise ? x : x * tileWidth
+            y = precise ? y : y * tileHeight
             if (flipped) {
                 context.save()
                 context.translate(canvas.width, 0)
@@ -496,14 +548,14 @@ let createSprite = (spriteX, spriteY) => {
                 context.drawImage(
                     spritesheet,
                     spriteX * tileWidth, spriteY * tileHeight, tileWidth, tileHeight,
-                    canvas.width - (x * tileWidth) - tileWidth, y * tileHeight, tileWidth, tileHeight
+                    canvas.width - x - tileWidth, y, tileWidth, tileHeight
                 )
                 context.restore()
             } else {
                 context.drawImage(
                     spritesheet,
                     spriteX * tileWidth, spriteY * tileHeight, tileWidth, tileHeight,
-                    x * tileWidth, y * tileHeight, tileWidth, tileHeight
+                    x, y, tileWidth, tileHeight
                 )
             }
         }
