@@ -1,5 +1,3 @@
-let title = 'l i m o n c h i k'
-
 let canvas, context
 let lastKey
 let keyDebounce = 0
@@ -36,6 +34,7 @@ let turnsSinceLastPredator
 
 let gameState
 
+let titleImage
 let spritesheet
 let images = {}
 
@@ -159,34 +158,10 @@ let generateMap = () => {
 
 let update = (timestamp) => {
     if (gameState === 'start') {
-        if (!lastAnimationFrame) lastAnimationFrame = timestamp
-        if (timestamp - lastAnimationFrame > 150) {
-            lastAnimationFrame = null
-            animationStep++
+        if (lastKey) {
+            gameState = 'play'
         }
-        
-        if (animationStep >= title.length) {
-            animationStep = title.length
-            if (lastKey) {
-                gameState = 'play'
-            }
-        } else {
-            lastKey = null
-        }
-
-        // draw background
-        context.fillStyle = '#444'
-        context.fillRect(0, 0, canvas.width, canvas.height)
-
-        // draw text
-        let text = title.slice(0, animationStep)
-        context.fillStyle = 'FFE700'
-        context.font = 'bold 48px sans-serif'
-        context.textAlign = 'left'
-        context.textBaseline = 'middle'
-        let textMetrics = context.measureText(title)
-        context.fillText(text, (canvas.width - textMetrics.width) / 2, canvas.height / 2)
-
+        context.drawImage(titleImage, 0, 0)
         window.requestAnimationFrame(update)
         return
     }
@@ -227,17 +202,16 @@ let update = (timestamp) => {
     if (!lastTimestamp) lastTimestamp = timestamp
     let dt = timestamp - lastTimestamp
 
-
     if (keyDebounce === 0) {
         let newAvatarX = avatarX
         let newAvatarY = avatarY
         let blocked = false
 
         // check input
-        if (lastKey === 'ArrowLeft') newAvatarX--
-        else if (lastKey === 'ArrowRight') newAvatarX++
-        else if (lastKey === 'ArrowUp') newAvatarY--
-        else if (lastKey === 'ArrowDown') newAvatarY++
+        if (lastKey === 'ArrowLeft' || lastKey === 'a') newAvatarX--
+        else if (lastKey === 'ArrowRight' || lastKey === 'd') newAvatarX++
+        else if (lastKey === 'ArrowUp' || lastKey === 'w') newAvatarY--
+        else if (lastKey === 'ArrowDown' || lastKey === 's') newAvatarY++
 
         // set direction of avatar
         if (newAvatarX > avatarX) avatarDirection = 'right'
@@ -307,7 +281,7 @@ let update = (timestamp) => {
     keyDebounce = Math.max(0, keyDebounce - dt)
     lastTimestamp = timestamp
 
-    // clear screen
+    // draw background
     context.fillStyle = '#DAD1AB'
     context.fillRect(0, 0, canvas.width, canvas.height)
 
@@ -537,26 +511,32 @@ let endGame = () => {
 }
 
 let createSprite = (spriteX, spriteY) => {
+    let spriteLeftCanvas = document.createElement('canvas')
+    let spriteLeftContext = spriteLeftCanvas.getContext('2d')
+    spriteLeftContext.drawImage(
+        spritesheet,
+        spriteX * tileWidth, spriteY * tileHeight, tileWidth, tileHeight,
+        0, 0, tileWidth, tileHeight
+    )
+    
+    let spriteRightCanvas = document.createElement('canvas')
+    let spriteRightContext = spriteRightCanvas.getContext('2d')
+    spriteRightContext.translate(canvas.width, 0)
+    spriteRightContext.scale(-1, 1)
+    spriteRightContext.drawImage(
+        spritesheet,
+        spriteX * tileWidth, spriteY * tileHeight, tileWidth, tileHeight,
+        canvas.width - tileWidth, 0, tileWidth, tileHeight
+    )
+
     return {
         draw: (x, y, flipped, precise) => {
             x = precise ? x : x * tileWidth
             y = precise ? y : y * tileHeight
             if (flipped) {
-                context.save()
-                context.translate(canvas.width, 0)
-                context.scale(-1, 1)
-                context.drawImage(
-                    spritesheet,
-                    spriteX * tileWidth, spriteY * tileHeight, tileWidth, tileHeight,
-                    canvas.width - x - tileWidth, y, tileWidth, tileHeight
-                )
-                context.restore()
+                context.drawImage(spriteRightCanvas, x, y)
             } else {
-                context.drawImage(
-                    spritesheet,
-                    spriteX * tileWidth, spriteY * tileHeight, tileWidth, tileHeight,
-                    x, y, tileWidth, tileHeight
-                )
+                context.drawImage(spriteLeftCanvas, x, y)
             }
         }
     }
@@ -569,6 +549,8 @@ window.onload = () => {
     canvas.height = screenHeight * tileHeight
     context = canvas.getContext('2d')
     main.appendChild(canvas)
+
+    titleImage = document.getElementById('title')
 
     spritesheet = document.getElementById('spritesheet')
     images = {
@@ -592,13 +574,13 @@ window.onload = () => {
     }
 
     document.addEventListener('keydown', e => {
-        if (!e.key.includes('Arrow')) return
+        if (!e.key.includes('Arrow') && e.key !== 'w' && e.key !== 'a' && e.key !== 's' && e.key !== 'd') return
         e.preventDefault()
         lastKey = e.key
     })
 
     document.addEventListener('keyup', e => {
-        if (!e.key.includes('Arrow')) return
+        if (!e.key.includes('Arrow') && e.key !== 'w' && e.key !== 'a' && e.key !== 's' && e.key !== 'd') return
         keyDebounce = 0
     })
 
